@@ -21,13 +21,19 @@ func NewServeCommand() *cobra.Command {
 }
 
 func runServe(cmd *cobra.Command, args []string) {
+	router := SetupRouter()
+
+	err := router.Run("0.0.0.0:8080")
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func SetupRouter() *gin.Engine {
 	router := gin.New()
 	corsMiddleware := cors.New(cors.Config{
 		AllowOrigins: []string{"*"},
 		AllowMethods: []string{"GET", "POST"},
-		//AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "x-access-token"},
-		//ExposeHeaders:    []string{"Content-Length"},
-		//AllowCredentials: true,
 		AllowOriginFunc: func(origin string) bool {
 			return true
 		},
@@ -46,8 +52,5 @@ func runServe(cmd *cobra.Command, args []string) {
 	router.POST("/", translationJobRouter.CreateJob)
 	router.GET("/status/:job_id", translationJobRouter.GetJobStatus)
 
-	err := router.Run("0.0.0.0:8080")
-	if err != nil {
-		log.Fatal(err)
-	}
+	return router
 }

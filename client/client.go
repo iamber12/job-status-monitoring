@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-// JobStatus represents the current status of a job
 type JobStatus string
 
 const (
@@ -31,22 +30,27 @@ type CreateJobResponse struct {
 	Payload CreateJobPayload `json:"payload"`
 }
 
-// StatusResponse is the response returned by the server
 type StatusResponse struct {
 	Payload StatusResponsePayload `json:"payload"`
 }
 
-// Client is used to talk to the status server
-type Client struct {
+type Client interface {
+	CreateJob(ctx context.Context) (string, error)
+	WaitForJob(ctx context.Context, jobID string) (*StatusResponsePayload, error)
+	SetMaxAttempts(maxAttempts int) error
+	SetBaseDelay(baseDelay time.Duration) error
+	SetMaxDelay(maxDelay time.Duration) error
+}
+
+type client struct {
 	baseURL     string
 	maxAttempts int
 	baseDelay   time.Duration
 	maxDelay    time.Duration
 }
 
-// NewClient creates a new Client
-func NewClient(baseURL string) *Client {
-	return &Client{
+func NewClient(baseURL string) Client {
+	return client{
 		baseURL:     baseURL,
 		maxAttempts: 10,
 		baseDelay:   100 * time.Millisecond,
@@ -54,20 +58,7 @@ func NewClient(baseURL string) *Client {
 	}
 }
 
-func (c *Client) SetMaxAttempts(maxAttempts int) {
-	c.maxAttempts = maxAttempts
-}
-
-func (c *Client) SetBaseDelay(baseDelay time.Duration) {
-	c.baseDelay = baseDelay
-}
-
-func (c *Client) SetMaxDelay(maxDelay time.Duration) {
-	c.maxDelay = maxDelay
-}
-
-// CreateJob sends a POST request to create a job and returns the job ID
-func (c *Client) CreateJob(ctx context.Context) (string, error) {
+func (c client) CreateJob(ctx context.Context) (string, error) {
 	url := fmt.Sprintf("%s/", c.baseURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
@@ -97,16 +88,15 @@ func (c *Client) CreateJob(ctx context.Context) (string, error) {
 	return createResp.Payload.JobID, nil
 }
 
-func (c *Client) WaitForJob(ctx context.Context, jobID string) (*StatusResponsePayload, error) {
+func (c client) WaitForJob(ctx context.Context, jobID string) (*StatusResponsePayload, error) {
 	return c.waitForJob(ctx, jobID, nil)
 }
 
-func (c *Client) WaitForJobWithUpdates(ctx context.Context, jobID string, statusUpdate chan<- string) (*StatusResponsePayload, error) {
+func (c client) WaitForJobWithUpdates(ctx context.Context, jobID string, statusUpdate chan<- string) (*StatusResponsePayload, error) {
 	return c.waitForJob(ctx, jobID, statusUpdate)
 }
 
-// WaitForJob checks the job status and waits until it's completed or fails
-func (c *Client) waitForJob(ctx context.Context, jobID string, statusUpdate chan<- string) (*StatusResponsePayload, error) {
+func (c client) waitForJob(ctx context.Context, jobID string, statusUpdate chan<- string) (*StatusResponsePayload, error) {
 	for attempt := 0; attempt < c.maxAttempts; attempt++ {
 		select {
 		case <-ctx.Done():
@@ -114,7 +104,10 @@ func (c *Client) waitForJob(ctx context.Context, jobID string, statusUpdate chan
 		default:
 		}
 
-		status, _ := c.getStatus(jobID)
+		status, err := c.getStatus(jobID)
+		if status == nil && err != nil {
+			return nil, err
+		}
 
 		switch status.Payload.Result {
 		case StatusCompleted:
@@ -140,8 +133,7 @@ func (c *Client) waitForJob(ctx context.Context, jobID string, statusUpdate chan
 	return nil, errors.New("job did not complete after maximum retries")
 }
 
-// getStatus makes an HTTP request to check the job status
-func (c *Client) getStatus(jobID string) (*StatusResponse, error) {
+func (c client) getStatus(jobID string) (*StatusResponse, error) {
 	url := fmt.Sprintf("%s/status/%s", c.baseURL, jobID)
 
 	resp, err := http.Get(url)
@@ -153,24 +145,50 @@ func (c *Client) getStatus(jobID string) (*StatusResponse, error) {
 	var statusResp StatusResponse
 	err = json.NewDecoder(resp.Body).Decode(&statusResp)
 
-	if resp.StatusCode != http.StatusOK {
-		return &statusResp, fmt.Errorf("server returned error: %d", resp.StatusCode)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	if err != nil {
-		return &statusResp, fmt.Errorf("failed to parse response: %w", err)
+	if resp.StatusCode != http.StatusOK {
+		return &statusResp, fmt.Errorf("server returned error: %d", resp.StatusCode)
 	}
 
 	return &statusResp, nil
 }
 
-// calculateBackoff calculates an exponential backoff with jitter
 func calculateBackoff(attempt int, baseDelay, maxDelay time.Duration) time.Duration {
 	backoff := baseDelay * (1 << attempt)
 	if backoff > maxDelay {
 		backoff = maxDelay
 	}
-	// Add jitter to spread out retries
+
 	jitter := time.Duration(rand.Int63n(int64(backoff) / 2))
 	return backoff + jitter
+}
+
+func (c client) SetMaxAttempts(maxAttempts int) error {
+	if maxAttempts < 1 {
+		return errors.New("max attempts must be greater than zero")
+	}
+	c.maxAttempts = maxAttempts
+	return nil
+}
+
+func (c client) SetBaseDelay(baseDelay time.Duration) error {
+	if baseDelay <= 0 {
+		return fmt.Errorf("baseDelay must be greater than 0, got: %v", baseDelay)
+	}
+	c.baseDelay = baseDelay
+	return nil
+}
+
+func (c client) SetMaxDelay(maxDelay time.Duration) error {
+	if maxDelay <= 0 {
+		return fmt.Errorf("maxDelay must be greater than 0, got: %v", maxDelay)
+	}
+	if maxDelay < c.baseDelay {
+		return fmt.Errorf("maxDelay (%v) must be greater than or equal to baseDelay (%v)", maxDelay, c.baseDelay)
+	}
+	c.maxDelay = maxDelay
+	return nil
 }

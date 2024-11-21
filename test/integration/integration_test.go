@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"net/http/httptest"
 	"testing"
-	"video-translation-status/client"
+	client "video-translation-status/client"
 	"video-translation-status/server/cmd/serve"
 )
 
@@ -51,8 +51,8 @@ which does not terminate when serverCmd.Process.Kill() is executed.****
 		}()
 	}
 */
-func setupTestServer(t *testing.T) (*httptest.Server, *client.Client) {
-	t.Helper() // Marks this function as a test helper for better error reporting.
+func setupTestServer(t *testing.T) (*httptest.Server, client.Client) {
+	t.Helper()
 
 	router := serve.SetupRouter()
 	ts := httptest.NewServer(router)

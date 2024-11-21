@@ -37,6 +37,7 @@ type StatusResponse struct {
 type Client interface {
 	CreateJob(ctx context.Context) (string, error)
 	WaitForJob(ctx context.Context, jobID string) (*StatusResponsePayload, error)
+	WaitForJobWithUpdates(ctx context.Context, jobID string, statusUpdate chan<- string) (*StatusResponsePayload, error)
 	SetMaxAttempts(maxAttempts int) error
 	SetBaseDelay(baseDelay time.Duration) error
 	SetMaxDelay(maxDelay time.Duration) error
@@ -50,7 +51,7 @@ type client struct {
 }
 
 func NewClient(baseURL string) Client {
-	return client{
+	return &client{
 		baseURL:     baseURL,
 		maxAttempts: 10,
 		baseDelay:   100 * time.Millisecond,
@@ -58,7 +59,7 @@ func NewClient(baseURL string) Client {
 	}
 }
 
-func (c client) CreateJob(ctx context.Context) (string, error) {
+func (c *client) CreateJob(ctx context.Context) (string, error) {
 	url := fmt.Sprintf("%s/", c.baseURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
@@ -88,15 +89,15 @@ func (c client) CreateJob(ctx context.Context) (string, error) {
 	return createResp.Payload.JobID, nil
 }
 
-func (c client) WaitForJob(ctx context.Context, jobID string) (*StatusResponsePayload, error) {
+func (c *client) WaitForJob(ctx context.Context, jobID string) (*StatusResponsePayload, error) {
 	return c.waitForJob(ctx, jobID, nil)
 }
 
-func (c client) WaitForJobWithUpdates(ctx context.Context, jobID string, statusUpdate chan<- string) (*StatusResponsePayload, error) {
+func (c *client) WaitForJobWithUpdates(ctx context.Context, jobID string, statusUpdate chan<- string) (*StatusResponsePayload, error) {
 	return c.waitForJob(ctx, jobID, statusUpdate)
 }
 
-func (c client) waitForJob(ctx context.Context, jobID string, statusUpdate chan<- string) (*StatusResponsePayload, error) {
+func (c *client) waitForJob(ctx context.Context, jobID string, statusUpdate chan<- string) (*StatusResponsePayload, error) {
 	for attempt := 0; attempt < c.maxAttempts; attempt++ {
 		select {
 		case <-ctx.Done():
@@ -133,7 +134,7 @@ func (c client) waitForJob(ctx context.Context, jobID string, statusUpdate chan<
 	return nil, errors.New("job did not complete after maximum retries")
 }
 
-func (c client) getStatus(jobID string) (*StatusResponse, error) {
+func (c *client) getStatus(jobID string) (*StatusResponse, error) {
 	url := fmt.Sprintf("%s/status/%s", c.baseURL, jobID)
 
 	resp, err := http.Get(url)
@@ -166,7 +167,7 @@ func calculateBackoff(attempt int, baseDelay, maxDelay time.Duration) time.Durat
 	return backoff + jitter
 }
 
-func (c client) SetMaxAttempts(maxAttempts int) error {
+func (c *client) SetMaxAttempts(maxAttempts int) error {
 	if maxAttempts < 1 {
 		return errors.New("max attempts must be greater than zero")
 	}
@@ -174,7 +175,7 @@ func (c client) SetMaxAttempts(maxAttempts int) error {
 	return nil
 }
 
-func (c client) SetBaseDelay(baseDelay time.Duration) error {
+func (c *client) SetBaseDelay(baseDelay time.Duration) error {
 	if baseDelay <= 0 {
 		return fmt.Errorf("baseDelay must be greater than 0, got: %v", baseDelay)
 	}
@@ -182,7 +183,7 @@ func (c client) SetBaseDelay(baseDelay time.Duration) error {
 	return nil
 }
 
-func (c client) SetMaxDelay(maxDelay time.Duration) error {
+func (c *client) SetMaxDelay(maxDelay time.Duration) error {
 	if maxDelay <= 0 {
 		return fmt.Errorf("maxDelay must be greater than 0, got: %v", maxDelay)
 	}

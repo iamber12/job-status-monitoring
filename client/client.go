@@ -88,7 +88,7 @@ func (c *client) CreateJob(ctx context.Context) (string, error) {
 	}
 
 	if createResp.Payload.JobID == "" {
-		return "", fmt.Errorf("job ID is missing in the response")
+		return "", errors.New("job ID is missing in the response")
 	}
 
 	return createResp.Payload.JobID, nil
@@ -109,7 +109,7 @@ func (c *client) waitForJob(ctx context.Context, jobID string, statusUpdate chan
 		select {
 		case <-ctx.Done():
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				return nil, fmt.Errorf("operation timed out: the job did not complete within the expected time frame")
+				return nil, errors.New("operation timed out: the job did not complete within the expected time frame")
 			}
 			return nil, ctx.Err()
 		default:

@@ -115,7 +115,7 @@ func (c *client) waitForJob(ctx context.Context, jobID string, statusUpdate chan
 		default:
 		}
 
-		status, err := c.getStatus(jobID)
+		status, err := c.getStatus(ctx, jobID)
 		if status == nil && err != nil {
 			return nil, err
 		}
@@ -130,6 +130,9 @@ func (c *client) waitForJob(ctx context.Context, jobID string, statusUpdate chan
 				select {
 				case statusUpdate <- fmt.Sprintf("Attempt %d: job is pending", attempt+1):
 				case <-ctx.Done():
+					if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+						return nil, errors.New("operation timed out: the job did not complete within the expected time frame")
+					}
 					return nil, ctx.Err()
 				}
 			}
@@ -144,19 +147,22 @@ func (c *client) waitForJob(ctx context.Context, jobID string, statusUpdate chan
 	return nil, errors.New("job did not complete after maximum retries")
 }
 
-func (c *client) getStatus(jobID string) (*StatusResponse, error) {
+func (c *client) getStatus(ctx context.Context, jobID string) (*StatusResponse, error) {
 	url := fmt.Sprintf("%s/status/%s", c.baseURL, jobID)
 
-	resp, err := http.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	var statusResp StatusResponse
-	err = json.NewDecoder(resp.Body).Decode(&statusResp)
-
-	if err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&statusResp); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 

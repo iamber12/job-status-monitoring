@@ -7,14 +7,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"net/http/httptest"
 	"testing"
+	"time"
 	client "video-translation-status/client"
 	"video-translation-status/server/cmd/serve"
 )
 
 const (
-	COMPLETED       = "completed"
-	ERROR           = "error"
-	MAX_RETRY_ERROR = "job did not complete after maximum retries"
+	COMPLETED             = "completed"
+	ERROR                 = "error"
+	MAX_RETRY_ERROR       = "job did not complete after maximum retries"
+	REQUEST_TIMEOUT_ERROR = "operation timed out: the job did not complete within the expected time frame"
 )
 
 func printStatusUpdates(statusUpdate <-chan string) {
@@ -64,7 +66,7 @@ func setupTestServer(t *testing.T) (*httptest.Server, client.Client) {
 
 func TestIntegration(t *testing.T) {
 	t.Run("Valid Response Test", func(t *testing.T) {
-		fmt.Println("**** Starting Valid Response Test ****")
+		fmt.Println("**** Test 1 - Starting Valid Response Test ****")
 		ts, clientObj := setupTestServer(t)
 		defer ts.Close()
 
@@ -79,6 +81,7 @@ func TestIntegration(t *testing.T) {
 
 		statusUpdate := make(chan string)
 		go printStatusUpdates(statusUpdate)
+		defer close(statusUpdate)
 
 		fmt.Println("Waiting for the job to complete...")
 		resp, err := clientObj.WaitForJobWithUpdates(ctx, jobID, statusUpdate)
@@ -96,7 +99,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("Max Attempts Error Test", func(t *testing.T) {
-		fmt.Println("**** Starting Max Attempts Error Test ****")
+		fmt.Println("**** Test 2 - Starting Max Attempts Error Test ****")
 		ts, clientObj := setupTestServer(t)
 		defer ts.Close()
 
@@ -117,6 +120,7 @@ func TestIntegration(t *testing.T) {
 
 		statusUpdate := make(chan string)
 		go printStatusUpdates(statusUpdate)
+		defer close(statusUpdate)
 
 		fmt.Println("Waiting for the job to complete...")
 		resp, err := clientObj.WaitForJobWithUpdates(ctx, jobID, statusUpdate)
@@ -127,8 +131,40 @@ func TestIntegration(t *testing.T) {
 				t.Fatalf("Failed to wait for job: %v", err)
 				return
 			} else {
-				fmt.Printf("Error: %s\n", err.Error())
+				fmt.Printf("Error: %s\n\n", err.Error())
 			}
 		}
+	})
+
+	t.Run("Timeout Error Test", func(t *testing.T) {
+		fmt.Println("**** Test 3 - Starting Timeout Error Test ****")
+		ts, clientObj := setupTestServer(t)
+		defer ts.Close()
+
+		ctx := context.Background()
+
+		fmt.Println("Creating a new job...")
+		jobID, err := clientObj.CreateJob(ctx)
+		if err != nil {
+			t.Fatalf("Failed to create job: %v", err)
+			return
+		}
+		fmt.Printf("Job created successfully! Job ID: %s\n", jobID)
+
+		statusUpdate := make(chan string)
+		go printStatusUpdates(statusUpdate)
+		defer close(statusUpdate)
+
+		err = clientObj.SetTimeout(1 * time.Millisecond)
+		if err != nil {
+			t.Fatalf("Failed to set timeout: %v", err)
+			return
+		}
+		fmt.Println("Waiting for the job to complete...")
+
+		_, err = clientObj.WaitForJobWithUpdates(ctx, jobID, statusUpdate)
+		expectedError := errors.New(REQUEST_TIMEOUT_ERROR)
+		assert.Equal(t, err, expectedError)
+		fmt.Printf("Error: %s\n", err.Error())
 	})
 }

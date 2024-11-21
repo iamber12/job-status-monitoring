@@ -41,6 +41,7 @@ type Client interface {
 	SetMaxAttempts(maxAttempts int) error
 	SetBaseDelay(baseDelay time.Duration) error
 	SetMaxDelay(maxDelay time.Duration) error
+	SetTimeout(timeout time.Duration) error
 }
 
 type client struct {
@@ -48,6 +49,7 @@ type client struct {
 	maxAttempts int
 	baseDelay   time.Duration
 	maxDelay    time.Duration
+	timeout     time.Duration
 }
 
 func NewClient(baseURL string) Client {
@@ -56,10 +58,13 @@ func NewClient(baseURL string) Client {
 		maxAttempts: 10,
 		baseDelay:   100 * time.Millisecond,
 		maxDelay:    10 * time.Second,
+		timeout:     2 * time.Minute,
 	}
 }
 
 func (c *client) CreateJob(ctx context.Context) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
 	url := fmt.Sprintf("%s/", c.baseURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
@@ -98,9 +103,14 @@ func (c *client) WaitForJobWithUpdates(ctx context.Context, jobID string, status
 }
 
 func (c *client) waitForJob(ctx context.Context, jobID string, statusUpdate chan<- string) (*StatusResponsePayload, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
 	for attempt := 0; attempt < c.maxAttempts; attempt++ {
 		select {
 		case <-ctx.Done():
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				return nil, fmt.Errorf("operation timed out: the job did not complete within the expected time frame")
+			}
 			return nil, ctx.Err()
 		default:
 		}
@@ -191,5 +201,13 @@ func (c *client) SetMaxDelay(maxDelay time.Duration) error {
 		return fmt.Errorf("maxDelay (%v) must be greater than or equal to baseDelay (%v)", maxDelay, c.baseDelay)
 	}
 	c.maxDelay = maxDelay
+	return nil
+}
+
+func (c *client) SetTimeout(timeout time.Duration) error {
+	if timeout <= 0 {
+		return fmt.Errorf("timeout must be greater than 0, got: %v", timeout)
+	}
+	c.timeout = timeout
 	return nil
 }

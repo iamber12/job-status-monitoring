@@ -55,7 +55,6 @@ git clone https://github.com/iamber12/video-translation-status.git
 
 #### Assuming the following project structure
 ```css
-D:\Golang\Projects\test
 ├── your-project-name
     ├── go.mod                  
     ├── main.go                 
@@ -157,7 +156,7 @@ go run main.go
 
 ## Troubleshooting
 
-### Error: `package test/video-translation-status/client is not in std (#GOROOT)`
+### Error: `package your-project-name/video-translation-status/client is not in std (#GOROOT)`
 
 If you encounter this error, it means Go is trying to resolve the package from the standard library (`#GOROOT`) instead of your local module. To fix this issue, make sure your `go.mod` file includes the following entries:
 

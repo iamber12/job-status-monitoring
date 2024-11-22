@@ -14,7 +14,7 @@
 4. [Configuration](#configuration)
 5. [Running the Program](#running-the-program)
 6. [Troubleshooting](#troubleshooting)
-    - [Error: package test/video-translation-status/client is not in std (#GOROOT)](#error-package-testvideo-translation-statusclient-is-not-in-std-goroot)
+    - [Error: package your-project-name/video-translation-status/client is not in std (#GOROOT)](#error-package-your-project-namevideo-translation-statusclient-is-not-in-std-goroot)
 7. [Algorithm Used](#algorithm-used)
 
 ## Running Integration Tests
@@ -26,7 +26,7 @@ go test -v -count=1 ./test/integration
 ```
 
 ## Spinning up the server
-`server` is the client package used to launch the Job Status server.
+`server` is the package used to launch the Job Status server.
 
 Fetch the package using:
 ```bash
@@ -162,10 +162,10 @@ If you encounter this error, it means Go is trying to resolve the package from t
 
 ```go
 require (
-    test/video-translation-status v0.0.0
+    your-project-name/video-translation-status v0.0.0
 )
 
-replace test/video-translation-status => ./video-translation-status
+replace your-project-name/video-translation-status => ./video-translation-status
 ```
 
 ## Algorithm Used

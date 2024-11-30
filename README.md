@@ -1,9 +1,8 @@
 # Job Status Monitoring
 
 ## Table of Contents
-1. [Running Integration Tests](#running-integration-tests)
-2. [Spinning up the Server](#spinning-up-the-server)
-3. [Client Library](#client-library)
+1. [Spinning up the Server](#spinning-up-the-server)
+2. [Client Library](#client-library)
     - [Installation](#installation)
     - [Usage](#usage)
         - [Importing the Package](#importing-the-package)
@@ -11,31 +10,24 @@
         - [Creating a Job](#creating-a-job)
         - [Waiting for Job Completion](#waiting-for-job-completion)
         - [Real-Time Status Updates](#real-time-status-updates)
-4. [Configuration](#configuration)
-5. [Running the Program](#running-the-program)
+3. [Configuration](#configuration)
+4. [Running the Program](#running-the-program)
+5. [Running Integration Tests](#running-integration-tests)
 6. [Troubleshooting](#troubleshooting)
-    - [Error: package your-project-name/video-translation-status/client is not in std (#GOROOT)](#error-package-your-project-namevideo-translation-statusclient-is-not-in-std-goroot)
+    - [Error: package your-project-name/job-status-monitoring/client is not in std (#GOROOT)](#error-package-your-project-namejob-status-monitoringclient-is-not-in-std-goroot)
 7. [Algorithm Used](#algorithm-used)
-
-## Running Integration Tests
-
-To execute the integration test, use the following command:
-
-```bash
-go test -v -count=1 ./test/integration
-```
 
 ## Spinning up the server
 `server` is the package used to launch the Job Status server.
 
 Fetch the package using:
 ```bash
-git clone https://github.com/iamber12/video-translation-status.git
+git clone https://github.com/iamber12/job-status-monitoring.git
 ```
 
 Run server
 ```bash
-cd video-translation-status/server
+cd job-status-monitoring/server
 go build -o ./bin/server ./cmd/main.go 
 ./bin/server serve
 ```
@@ -46,7 +38,7 @@ go build -o ./bin/server ./cmd/main.go
 
 Fetch the package using:
 ```bash
-git clone https://github.com/iamber12/video-translation-status.git
+git clone https://github.com/iamber12/job-status-monitoring.git
 ```
 
 ## Usage
@@ -58,7 +50,7 @@ git clone https://github.com/iamber12/video-translation-status.git
 ├── your-project-name
     ├── go.mod                  
     ├── main.go                 
-    ├── video-translation-status
+    ├── job-status-monitoring
         ├── client
             ├── client.go       
 
@@ -70,7 +62,7 @@ import (
     "context"
     "fmt"
     "time"
-    "your-project-name/video-translation-status/client"
+    "your-project-name/job-status-monitoring/client"
 )
 ```
 
@@ -154,18 +146,26 @@ if err != nil {
 go run main.go
 ```
 
+## Running Integration Tests
+
+To execute the integration test, use the following command:
+
+```bash
+go test -v -count=1 ./test/integration
+```
+
 ## Troubleshooting
 
-### Error: `package your-project-name/video-translation-status/client is not in std (#GOROOT)`
+### Error: `package your-project-name/job-status-monitoring/client is not in std (#GOROOT)`
 
 If you encounter this error, it means Go is trying to resolve the package from the standard library (`#GOROOT`) instead of your local module. To fix this issue, make sure your `go.mod` file includes the following entries:
 
 ```go
 require (
-    your-project-name/video-translation-status v0.0.0
+    your-project-name/job-status-monitoring v0.0.0
 )
 
-replace your-project-name/video-translation-status => ./video-translation-status
+replace your-project-name/job-status-monitoring => ./job-status-monitoring
 ```
 
 ## Algorithm Used

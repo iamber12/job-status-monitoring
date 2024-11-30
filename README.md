@@ -1,4 +1,4 @@
-# Video Translation Job Status
+# Job Status Monitoring
 
 ## Table of Contents
 1. [Running Integration Tests](#running-integration-tests)

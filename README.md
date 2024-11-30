@@ -1,4 +1,4 @@
-# Job Status Monitoring
+# JobSync: Real-Time Job Status Monitoring
 
 ## Table of Contents
 1. [Spinning up the Server](#spinning-up-the-server)
